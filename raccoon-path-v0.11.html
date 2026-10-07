@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Trash Panda Run</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #1c2238; --bg-deep: #13182a;
+    --tile-a: #2f6d78; --tile-b: #28606b; --counter: #1b2238;
+    --path: #ff5a36; --path-soft: rgba(255,90,54,.3);
+    --lamp: #ffe066; --text: #f7f2ea; --muted: #a3acc4;
+    --fur: #a7adb4; --mask: #2a2f3a; --danger: #ff3b3b; --snack: #fff1c9;
+    --font: "Fredoka", "Trebuchet MS", "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #18212f; } }
+  :root[data-theme="dark"] { --bg: #18212f; }
+  :root[data-kitchen="1"] { --tile-a: #6b5a8f; --tile-b: #5d4e7e; --counter: #241c3a; --bg: #1f1a30; --bg-deep: #15112a; }
+  :root[data-kitchen="2"] { --tile-a: #7a6a3c; --tile-b: #6a5c33; --counter: #2b2416; --bg: #26211a; --bg-deep: #1a1711; }
+  :root[data-kitchen="3"] { --tile-a: #3e6b4e; --tile-b: #355d44; --counter: #16261c; --bg: #19221c; --bg-deep: #111814; }
+  .arrowTile { pointer-events: none; }
+  #dailyBtn { font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--lamp); background: none; border: 1px solid var(--lamp); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+  #dailyCard { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; gap: 10px; z-index: 7; }
+  #dailyCard.show { display: flex; }
+  #dailyCard h1 { font-size: 30px; font-weight: 600; margin: 0; }
+  #dailyCard p { color: var(--muted); margin: 0; max-width: 32ch; }
+  #dailyCard .big { font-size: 44px; font-weight: 600; color: var(--lamp); }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  #app { height: 100%; display: flex; flex-direction: column; align-items: center; }
+  header { width: 100%; max-width: 520px; display: flex; justify-content: space-between; align-items: baseline; padding: 14px 20px 4px; }
+  #levelNum { font-size: 28px; font-weight: 600; letter-spacing: .5px; }
+  #levelNum small { font-size: 15px; font-weight: 400; color: var(--muted); margin-right: 6px; }
+  #spotted { font-size: 14px; color: var(--text); background: rgba(255,59,59,.22); border-radius: 999px; padding: 4px 10px; display: none; }
+  #spotted.show { display: inline-block; }
+  #spotted b { color: var(--danger); font-weight: 600; }
+  #raccoon .pupil { opacity: 1; } #raccoon .xeye { opacity: 0; }
+  #raccoon.dead .pupil { opacity: 0; } #raccoon.dead .xeye { opacity: 1; }
+  main { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; padding: 8px; }
+  #board { width: min(96vw, 520px, 72vh); height: auto; display: block; touch-action: none; }
+  .hbtn { font-family: var(--font); font-size: 15px; font-weight: 600; color: var(--text); background: #2a3447; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+  .hbtn:focus-visible { outline: 2px solid var(--lamp); }
+  #menu { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; padding: 20px; overflow: auto; z-index: 4; }
+  #menu.show { display: flex; }
+  #menu h2 { margin: 8px 0 4px; font-weight: 600; font-size: 22px; }
+  #menu p { color: var(--muted); margin: 0 0 14px; font-size: 14px; }
+  .lgrid { display: grid; grid-template-columns: repeat(5, 56px); gap: 8px; margin-bottom: 18px; }
+  .lcell { font-family: var(--font); font-size: 16px; font-weight: 600; height: 48px; border: 0; border-radius: 12px; background: #2a3447; color: var(--text); cursor: pointer; }
+  .lcell.done { background: var(--tile-a); }
+  .lcell.current { outline: 3px solid var(--path); }
+  .lcell:disabled { opacity: .3; cursor: default; }
+  .missed { animation: blink .5s ease-in-out 2; }
+  @keyframes blink { 50% { fill: var(--danger); } }
+  footer { width: 100%; max-width: 520px; display: flex; justify-content: space-between; align-items: center; padding: 6px 20px 14px; font-size: 14px; color: var(--muted); }
+  #hintLine { min-height: 1.2em; color: var(--text); }
+  #retry { font-family: var(--font); font-size: 15px; color: var(--muted); background: none; border: 0; padding: 6px 0; cursor: pointer; }
+  #ver { font-size: 12px; cursor: pointer; margin-left: 12px; }
+  #intro { position: fixed; inset: 0; background: rgba(10,13,24,.72); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 6; }
+  #intro.show { display: flex; }
+  #intro .card { background: var(--bg-deep); border-radius: 22px; padding: 22px 22px 18px; max-width: 340px; width: 100%; text-align: center; }
+  #intro .card svg { width: 150px; height: 150px; display: block; margin: 0 auto 10px; }
+  #intro h2 { margin: 0 0 6px; font-size: 24px; font-weight: 600; }
+  #intro p { margin: 0 0 14px; color: var(--muted); font-size: 16px; line-height: 1.35; }
+  #toast { position: fixed; left: 50%; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(20px); background: var(--bg-deep); color: var(--text); padding: 10px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #end { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; gap: 10px; }
+  #end.show { display: flex; }
+  #end h1 { font-size: 34px; font-weight: 600; margin: 0; }
+  #end p { color: var(--muted); margin: 0; max-width: 32ch; }
+  #end code { display: block; background: var(--bg-deep); padding: 12px 14px; border-radius: 12px; font-size: 13px; word-break: break-all; max-width: 320px; }
+  .btn { font-family: var(--font); font-size: 17px; font-weight: 600; background: var(--path); color: #2a1a06; border: 0; border-radius: 999px; padding: 12px 24px; cursor: pointer; margin-top: 8px; }
+  .btn.quiet { background: #334055; color: var(--text); }
+  #debug { position: fixed; top: 0; right: 0; bottom: 0; width: min(92vw, 380px); background: var(--bg-deep); overflow: auto; padding: 12px; font-size: 12px; display: none; z-index: 5; }
+  #debug.show { display: block; }
+  #debug table { border-collapse: collapse; width: 100%; } #debug td, #debug th { padding: 3px 4px; text-align: left; border-bottom: 1px solid #222c3a; }
+  @media (prefers-reduced-motion: reduce) { .missed { animation: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="hbtn" id="menuBtn" type="button">Levels</button>
+    <div id="levelNum"><small>Level</small><span id="lvlText">1</span></div>
+    <button class="hbtn" id="retry" type="button">Start over</button>
+  </header>
+  <main><svg id="board" xmlns="http://www.w3.org/2000/svg"></svg></main>
+  <footer><span id="hintLine"></span><span><span id="spotted">Spotted <b id="spotN">0</b></span> <button id="dailyBtn" type="button">Daily</button><span id="ver">raccoon-path-v0.11</span></span></footer>
+</div>
+<div id="toast"></div>
+<div id="dailyCard">
+  <h1 id="dailyTitle">Daily puzzle</h1>
+  <div class="big" id="dailyTime"></div>
+  <p id="dailyText"></p>
+  <button class="btn" id="dailyShare" type="button">Share your time</button>
+  <button class="btn quiet" id="dailyBack" type="button">Back to levels</button>
+</div>
+<div id="intro"><div class="card"><div id="introPic"></div><h2 id="introTitle"></h2><p id="introText"></p><button class="btn" id="introOk" type="button">Got it</button></div></div>
+<div id="menu">
+  <h2 id="menuTitle">Levels</h2>
+  <p>Tap any level you have reached.</p>
+  <div id="menuGrids"></div>
+  <button class="btn quiet" id="menuClose" type="button">Back to the kitchen</button>
+  <button class="btn quiet" id="langBtn" type="button" style="margin-top:4px">日本語で表示</button>
+</div>
+<div id="end">
+  <h1>Every kitchen cleaned out</h1>
+  <p id="endStats"></p>
+  <p>Send this play code back to Yasu:</p>
+  <code id="playCode"></code>
+  <button class="btn" id="copyCode" type="button">Copy play code</button>
+  <button class="btn quiet" id="replay" type="button">Play again from level 1</button>
+</div>
+<div id="debug"></div>
+
+<script>
+/* Trash Panda Run — prototype raccoon-path-v0.10
+   Phase 1 / Gate 1 (Fun). Rules 1–3: reach the exit → visit every tile → snacks in order.
+   Levels were generated and solver-verified offline by tpr-generator.js and embedded below. */
+'use strict';
+/* Silent play logging: events are also posted to a Google Sheet through an Apps Script web app.
+   Paste the deployed script URL between the quotes below (leave empty to log on-device only). */
+const COLLECT_URL = '';
+const LANG_KEY = 'tpr-lang';
+let LANG = 'en';
+try { LANG = localStorage.getItem(LANG_KEY) || ((navigator.language || '').startsWith('ja') ? 'ja' : 'en'); } catch (e) {}
+const T = {
+  en: {
+    level: 'Level', daily: 'Daily', levels: 'Levels', startOver: 'Start over', spotted: 'Spotted',
+    ruleLine: { 1: 'Reach the window', 2: 'Cross every tile', 3: 'Snacks in order, every tile', 4: 'Arrows shove you. Snacks, every tile' },
+    ruleNames: { 1: 'Reach the window', 2: 'Every tile', 3: 'Snacks in order', 4: 'Slippery arrows' },
+    intro: {
+      1: ['Sneak to the window', 'Drag the raccoon along the floor to the open window. Drag back to undo.', 'Drag the raccoon with your mouse along the floor to the open window. Drag back to undo. (No keyboard controls yet.)'],
+      2: ['New rule: every tile', 'Now the raccoon must cross every floor tile exactly once before reaching the window. A tile left behind means he gets spotted.'],
+      3: ['New rule: snacks in order', 'Grab the snacks in number order, 1 then 2 then 3, and still cross every tile before the window.'],
+      4: ['New rule: slippery arrows', 'Arrow tiles shove the raccoon one tile in the arrow direction, and there is no dragging back past a shove. Shoved into a counter or a crossed tile: spotted.'],
+    },
+    gotIt: 'Got it', menuTitle: 'Levels', menuHint: 'Tap any level you have reached.', backKitchen: 'Back to the kitchen', unlocked: 'All levels unlocked',
+    noWayBack: 'No way back past an arrow. Start over to retry.',
+    endTitle: 'Every kitchen cleaned out', endStats: (l, f, m) => `${l} levels, spotted ${f} times, about ${m} minutes.`, sendCode: 'Send this play code back to Yasu:', copyCode: 'Copy play code', replay: 'Play again from level 1',
+    copied: 'Copied', copyFail: 'Copy failed', copiedShare: 'Copied, paste it anywhere',
+    dailyFirst: 'Loot secured', dailyDone: 'Today is done', dailyText: (f, st) => `Spotted ${f} time${f === 1 ? '' : 's'} · streak ${st} day${st === 1 ? '' : 's'} · new puzzle at midnight`,
+    share: 'Share your time', backLevels: 'Back to levels', shareText: (n, t, f, st, url) => `Trash Panda Run daily #${n}: ${t}, spotted ${f}x, streak ${st}. Beat my time: ${url}`,
+    langBtn: '日本語で表示',
+  },
+  ja: {
+    level: 'レベル', daily: '今日の問題', levels: 'レベル一覧', startOver: 'やり直す', spotted: '見つかった回数',
+    ruleLine: { 1: '窓までたどり着こう', 2: '全部のマスを通ろう', 3: 'おやつは番号順に、全部のマスを通る', 4: '矢印に押される。おやつ順・全マス' },
+    ruleNames: { 1: '窓までたどり着く', 2: '全部のマス', 3: 'おやつは番号順', 4: 'すべる矢印' },
+    intro: {
+      1: ['窓までこっそり', 'アライグマを指でなぞって、床の上を開いた窓まで連れていこう。戻ると取り消せます。', 'マウスでアライグマをドラッグして、床の上を開いた窓まで連れていこう。戻ると取り消せます。（キーボード操作はまだありません）'],
+      2: ['新ルール：全部のマス', 'これからは窓に着く前に、床のマスを全部ちょうど一回ずつ通ります。通り残しがあると見つかってしまいます。'],
+      3: ['新ルール：おやつは番号順', 'おやつを 1、2、3 の順に取りながら、全部のマスを通って窓へ。'],
+      4: ['新ルール：すべる矢印', '矢印のマスに乗ると、矢印の向きに一マス押されます。押された後は、矢印より前には戻れません。カウンターや通ったマスに押し込まれると見つかります。'],
+    },
+    gotIt: 'わかった', menuTitle: 'レベル一覧', menuHint: '到達したレベルをタップ。', backKitchen: 'キッチンへ戻る', unlocked: '全レベルを解放しました',
+    noWayBack: '矢印より前には戻れません。「やり直す」でもう一度。',
+    endTitle: 'キッチン制覇！', endStats: (l, f, m) => `${l} レベル、見つかった回数 ${f}、約 ${m} 分。`, sendCode: 'このプレイコードをヤスに送ってください：', copyCode: 'プレイコードをコピー', replay: 'レベル1から遊ぶ',
+    copied: 'コピーしました', copyFail: 'コピーできませんでした', copiedShare: 'コピーしました。好きな場所に貼り付けてください',
+    dailyFirst: '戦利品ゲット', dailyDone: '今日はクリア済み', dailyText: (f, st) => `見つかった回数 ${f} · 連続 ${st} 日 · 新しい問題は深夜0時に`,
+    share: 'タイムをシェア', backLevels: 'レベルへ戻る', shareText: (n, t, f, st, url) => `Trash Panda Run 今日の問題 #${n}：${t}、見つかった ${f} 回、連続 ${st} 日。記録に挑戦：${url}`,
+    langBtn: 'Show in English',
+  },
+};
+const t = () => T[LANG];
+const VERSION = 'raccoon-path-v0.11';
+const LEVELS = [{"n":1,"rule":1,"w":4,"h":4,"open":"0110110001111101","start":2,"exit":15,"snacks":[],"arrows":{},"effort":3,"info":{"len":7,"decoy":3}},{"n":2,"rule":1,"w":4,"h":4,"open":"0111001001111101","start":1,"exit":15,"snacks":[],"arrows":{},"effort":4,"info":{"len":6,"decoy":4}},{"n":3,"rule":1,"w":5,"h":5,"open":"0010010101111111010001111","start":5,"exit":24,"snacks":[],"arrows":{},"effort":7,"info":{"len":8,"decoy":7}},{"n":4,"rule":1,"w":5,"h":5,"open":"1001110101111110100100111","start":22,"exit":7,"snacks":[],"arrows":{},"effort":8,"info":{"len":8,"decoy":8}},{"n":5,"rule":2,"w":5,"h":5,"open":"0011111101111111100011100","start":20,"exit":22,"snacks":[],"arrows":{},"effort":5,"info":{"len":17}},{"n":6,"rule":2,"w":5,"h":5,"open":"1111011111110010011101111","start":7,"exit":21,"snacks":[],"arrows":{},"effort":6,"info":{"len":19}},{"n":7,"rule":2,"w":5,"h":5,"open":"1111111111000110001100011","start":1,"exit":0,"snacks":[],"arrows":{},"effort":6,"info":{"len":16}},{"n":8,"rule":2,"w":5,"h":5,"open":"0111101111000110001100111","start":22,"exit":24,"snacks":[],"arrows":{},"effort":8,"info":{"len":15}},{"n":9,"rule":2,"w":6,"h":6,"open":"110000110111110111110011010110011100","start":13,"exit":16,"snacks":[],"arrows":{},"effort":6,"info":{"len":22}},{"n":10,"rule":2,"w":6,"h":6,"open":"001110001111000111010011011111001111","start":27,"exit":19,"snacks":[],"arrows":{},"effort":15,"info":{"len":22}},{"n":11,"rule":2,"w":6,"h":6,"open":"011111111111111000110000111110111100","start":14,"exit":28,"snacks":[],"arrows":{},"effort":25,"info":{"len":25}},{"n":12,"rule":2,"w":6,"h":6,"open":"011110111100111100111100001100001100","start":4,"exit":15,"snacks":[],"arrows":{},"effort":98,"info":{"len":20}},{"n":13,"rule":2,"w":7,"h":7,"open":"1101000111100011110001101111111111110010001111000","start":32,"exit":3,"snacks":[],"arrows":{},"effort":70,"info":{"len":30}},{"n":14,"rule":2,"w":7,"h":7,"open":"0001100001110100111110011011001111100110110000011","start":13,"exit":34,"snacks":[],"arrows":{},"effort":83,"info":{"len":26}},{"n":15,"rule":3,"w":6,"h":6,"open":"110011111111111111111111111011111111","start":9,"exit":33,"snacks":[18,4,23,25],"arrows":{},"effort":218,"info":{"len":33,"snacks":4,"arrows":0,"blocks":3}},{"n":16,"rule":3,"w":6,"h":6,"open":"011111111111111111111111111111111111","start":1,"exit":6,"snacks":[26,8,15,5,27,34,30],"arrows":{},"effort":312,"info":{"len":35,"snacks":7,"arrows":0,"blocks":1}},{"n":17,"rule":3,"w":6,"h":6,"open":"111111111111111111111111111111111111","start":20,"exit":28,"snacks":[24,14,6,5,23,26,10],"arrows":{},"effort":410,"info":{"len":36,"snacks":7,"arrows":0,"blocks":0}},{"n":18,"rule":3,"w":6,"h":6,"open":"111111111111111101111111100111111111","start":22,"exit":32,"snacks":[34,11,3,0,20,12],"arrows":{},"effort":500,"info":{"len":33,"snacks":6,"arrows":0,"blocks":3}},{"n":19,"rule":3,"w":6,"h":6,"open":"111111111111111111111111110111110111","start":25,"exit":33,"snacks":[18,7,14,4,23,34,10],"arrows":{},"effort":746,"info":{"len":34,"snacks":7,"arrows":0,"blocks":2}},{"n":20,"rule":3,"w":6,"h":6,"open":"111011111111111111111111111111111111","start":4,"exit":2,"snacks":[29,25,15,26,7],"arrows":{},"effort":951,"info":{"len":35,"snacks":5,"arrows":0,"blocks":1}},{"n":21,"rule":3,"w":7,"h":7,"open":"1111111111111111011111101111110011111111111111111","start":34,"exit":38,"snacks":[40,24,45,35,2,6,9],"arrows":{},"effort":660,"info":{"len":45,"snacks":7,"arrows":0,"blocks":4}},{"n":22,"rule":3,"w":7,"h":7,"open":"1101111111111111111111111111111111100111111111111","start":42,"exit":1,"snacks":[31,48,32,13,24,29,17,10],"arrows":{},"effort":869,"info":{"len":46,"snacks":8,"arrows":0,"blocks":3}},{"n":23,"rule":3,"w":7,"h":7,"open":"1111110101111011111111111111111111111111111111111","start":20,"exit":15,"snacks":[47,18,4,25,38,23,44,35,7],"arrows":{},"effort":1396,"info":{"len":46,"snacks":9,"arrows":0,"blocks":3}},{"n":24,"rule":3,"w":7,"h":7,"open":"1111110111110011111111111111111111111111011111111","start":5,"exit":39,"snacks":[8,11,21,31,28,45,27],"arrows":{},"effort":1707,"info":{"len":45,"snacks":7,"arrows":0,"blocks":4}},{"n":25,"rule":3,"w":7,"h":7,"open":"1111111111111111111110011111001111111111111111111","start":36,"exit":14,"snacks":[46,34,31,6,19,0,24],"arrows":{},"effort":1933,"info":{"len":45,"snacks":7,"arrows":0,"blocks":4}},{"n":26,"rule":3,"w":7,"h":7,"open":"1111111111110111111011111101111000111111111111111","start":30,"exit":10,"snacks":[36,44,45,48,6,9,0,17],"arrows":{},"effort":2016,"info":{"len":43,"snacks":8,"arrows":0,"blocks":6}},{"n":27,"rule":3,"w":7,"h":7,"open":"1111111111110011111111111111111111111111101111110","start":34,"exit":6,"snacks":[43,28,32,16,20,22,2],"arrows":{},"effort":5476,"info":{"len":45,"snacks":7,"arrows":0,"blocks":4}},{"n":28,"rule":3,"w":7,"h":7,"open":"1111111111111111111111111111111111111111111100011","start":47,"exit":42,"snacks":[26,38,15,32,19,4,8,28],"arrows":{},"effort":5758,"info":{"len":46,"snacks":8,"arrows":0,"blocks":3}},{"n":29,"rule":4,"w":7,"h":7,"open":"1111111111111100111111111111110111111111111111111","start":23,"exit":8,"snacks":[29,42,40,6,18,9],"arrows":{"10":2,"22":1,"26":1,"32":2,"33":0},"effort":1660,"info":{"len":46,"snacks":6,"arrows":5,"blocks":3}},{"n":30,"rule":4,"w":7,"h":7,"open":"1111111111110111111111111111111111111111001111000","start":45,"exit":5,"snacks":[43,9,22,2,31,25,34],"arrows":{"10":2,"29":0},"effort":2021,"info":{"len":43,"snacks":7,"arrows":2,"blocks":6}},{"n":31,"rule":4,"w":7,"h":7,"open":"1111111111111111100111110111111111111111111001111","start":42,"exit":31,"snacks":[0,4,13,33,40,37,8],"arrows":{"6":2,"12":2,"32":2,"38":1},"effort":2342,"info":{"len":44,"snacks":7,"arrows":4,"blocks":5}},{"n":32,"rule":4,"w":7,"h":7,"open":"1111111111011111000111111111111111111111111111111","start":19,"exit":15,"snacks":[38,43,40,13,1],"arrows":{"21":0,"32":3,"45":0},"effort":2923,"info":{"len":45,"snacks":5,"arrows":3,"blocks":4}},{"n":33,"rule":4,"w":7,"h":7,"open":"1111111111111111111111111111011101101111110111111","start":25,"exit":43,"snacks":[2,12,20,46,15,21,23],"arrows":{"6":2,"9":3,"24":3,"45":3,"48":1},"effort":3620,"info":{"len":45,"snacks":7,"arrows":5,"blocks":4}},{"n":34,"rule":4,"w":7,"h":7,"open":"1111111111111111111111111111001111100111110011111","start":30,"exit":34,"snacks":[9,7,5,13,32,48,25],"arrows":{"14":3,"45":0},"effort":12398,"info":{"len":43,"snacks":7,"arrows":2,"blocks":6}},{"n":35,"rule":4,"w":7,"h":7,"open":"1111111111111111110111110011111111111111111111111","start":4,"exit":11,"snacks":[28,17,35,46,33,19],"arrows":{"16":2,"39":1,"40":2},"effort":1071,"info":{"len":46,"snacks":6,"arrows":3,"blocks":3}},{"n":36,"rule":4,"w":7,"h":7,"open":"1111111111110111111111111111011111111111111111111","start":21,"exit":19,"snacks":[29,45,48,37,27,17,8],"arrows":{"5":0,"10":1,"24":3,"34":3,"38":1},"effort":1248,"info":{"len":47,"snacks":7,"arrows":5,"blocks":2}},{"n":37,"rule":4,"w":7,"h":7,"open":"1111111111111111111101111111111111111111111111111","start":8,"exit":19,"snacks":[13,1,28,30,34,38,15],"arrows":{"25":1,"31":0,"36":3},"effort":1553,"info":{"len":48,"snacks":7,"arrows":3,"blocks":1}},{"n":38,"rule":4,"w":7,"h":7,"open":"1111111111111111111111110111101111110111111111111","start":22,"exit":31,"snacks":[44,41,30,5,34,19],"arrows":{"2":1,"4":0,"16":0,"21":2},"effort":10535,"info":{"len":46,"snacks":6,"arrows":4,"blocks":3}},{"n":39,"rule":4,"w":7,"h":7,"open":"1111111111111111111111110011111111111111111111111","start":36,"exit":32,"snacks":[37,47,33,4,18,14,15],"arrows":{"9":2,"20":3,"21":0},"effort":11252,"info":{"len":47,"snacks":7,"arrows":3,"blocks":2}},{"n":40,"rule":4,"w":7,"h":7,"open":"1111111111011111111111111111111111111111111111111","start":18,"exit":11,"snacks":[],"arrows":{"8":1,"12":3,"13":2,"22":1,"28":0,"40":1},"effort":54476,"info":{"len":48,"snacks":0,"arrows":6,"blocks":1}}];
+const DAILY = [{"n":1,"rule":4,"w":7,"h":7,"open":"1111110111111111111111111111111110011111111111111","start":13,"exit":40,"snacks":[19,15,11,1,22,39,29,44],"arrows":{"25":1,"32":2,"36":3},"effort":953,"info":{"len":46,"snacks":8,"arrows":3,"blocks":3}},{"n":2,"rule":3,"w":7,"h":7,"open":"1111111111111111111111011111111111100111110111111","start":43,"exit":23,"snacks":[45,41,19,4,7,11,40,17,21],"arrows":{},"effort":3236,"info":{"len":45,"snacks":9,"arrows":0,"blocks":4}},{"n":3,"rule":4,"w":7,"h":7,"open":"1111111101111110111111111111100111111111111111111","start":36,"exit":14,"snacks":[32,35,24,41,6,16,4],"arrows":{"1":1,"28":3},"effort":3883,"info":{"len":45,"snacks":7,"arrows":2,"blocks":4}},{"n":4,"rule":3,"w":7,"h":7,"open":"1111111111101111110111111011111101111111111111111","start":12,"exit":30,"snacks":[48,6,2,22,43,46,8],"arrows":{},"effort":781,"info":{"len":45,"snacks":7,"arrows":0,"blocks":4}},{"n":5,"rule":4,"w":7,"h":7,"open":"0001111011111111111111111101111111111111111111111","start":19,"exit":8,"snacks":[40,30,22,29,44,48,13,12],"arrows":{"4":1,"10":1,"17":1,"23":1,"35":2},"effort":2219,"info":{"len":44,"snacks":8,"arrows":5,"blocks":5}},{"n":6,"rule":4,"w":7,"h":7,"open":"1111111111111011011101101111111111111111111111111","start":6,"exit":22,"snacks":[],"arrows":{"10":1,"33":2,"37":1,"38":2,"41":2},"effort":9813,"info":{"len":45,"snacks":0,"arrows":5,"blocks":4}},{"n":7,"rule":4,"w":7,"h":7,"open":"1111111111111111110111111001111110111111011111111","start":32,"exit":19,"snacks":[44,27,6,9,7,23,43,24],"arrows":{"5":1,"21":2},"effort":604,"info":{"len":44,"snacks":8,"arrows":2,"blocks":5}},{"n":8,"rule":4,"w":7,"h":7,"open":"1111111111111111111111111111111111111101101111110","start":45,"exit":40,"snacks":[28,11,13,15,27],"arrows":{"17":3,"23":1,"36":2},"effort":9377,"info":{"len":46,"snacks":5,"arrows":3,"blocks":3}},{"n":9,"rule":3,"w":7,"h":7,"open":"1111110111111111110111110011111111111111111111111","start":11,"exit":5,"snacks":[26,33,39,38,35,14,9,36,10],"arrows":{},"effort":608,"info":{"len":45,"snacks":9,"arrows":0,"blocks":4}},{"n":10,"rule":4,"w":7,"h":7,"open":"0011111001111110111111011111111111111111111111111","start":26,"exit":14,"snacks":[39,36,6],"arrows":{"12":0,"32":2,"34":3,"47":1},"effort":8057,"info":{"len":43,"snacks":3,"arrows":4,"blocks":6}},{"n":11,"rule":4,"w":7,"h":7,"open":"1111111111110111110011111011111111110111111111111","start":26,"exit":35,"snacks":[40,6,9,28,17],"arrows":{"0":2,"21":2,"27":3,"46":3},"effort":4665,"info":{"len":44,"snacks":5,"arrows":4,"blocks":5}},{"n":12,"rule":4,"w":7,"h":7,"open":"1111111111111111111111111101111111111111101111110","start":34,"exit":33,"snacks":[5,16,11,8,43,47,22],"arrows":{"18":2,"24":3,"31":0,"42":0,"46":0},"effort":1852,"info":{"len":46,"snacks":7,"arrows":5,"blocks":3}},{"n":13,"rule":3,"w":7,"h":7,"open":"1111111111111111111111111111111110100111010011111","start":28,"exit":32,"snacks":[45,23,9,22,1,12,20,26,47],"arrows":{},"effort":582,"info":{"len":43,"snacks":9,"arrows":0,"blocks":6}},{"n":14,"rule":3,"w":7,"h":7,"open":"1111111111111111100111110111110001111111111111111","start":25,"exit":19,"snacks":[37,22,1,21,46,41,13,2],"arrows":{},"effort":426,"info":{"len":43,"snacks":8,"arrows":0,"blocks":6}},{"n":15,"rule":4,"w":7,"h":7,"open":"0111111110011111011111111111111111111111111111111","start":7,"exit":17,"snacks":[36,45,26,30,24,2,20],"arrows":{"5":0,"12":1,"25":1,"37":3,"44":0},"effort":1641,"info":{"len":45,"snacks":7,"arrows":5,"blocks":4}},{"n":16,"rule":3,"w":7,"h":7,"open":"1101111110111111111111111111111111111111001111111","start":48,"exit":16,"snacks":[32,37,35,0,29,23,27,4,19],"arrows":{},"effort":415,"info":{"len":45,"snacks":9,"arrows":0,"blocks":4}},{"n":17,"rule":3,"w":7,"h":7,"open":"1111111111111111110111111110111100011111111111111","start":11,"exit":26,"snacks":[13,9,22,1,42,29,48,39],"arrows":{},"effort":723,"info":{"len":44,"snacks":8,"arrows":0,"blocks":5}},{"n":18,"rule":4,"w":7,"h":7,"open":"0011111001111101111111111111111111111111111111111","start":12,"exit":15,"snacks":[31,2,4,26,48,38,36],"arrows":{"6":2,"21":0,"23":0},"effort":6590,"info":{"len":44,"snacks":7,"arrows":3,"blocks":5}},{"n":19,"rule":3,"w":7,"h":7,"open":"1111111111100111111111110111110011111111111111111","start":37,"exit":10,"snacks":[27,40,46,35,28,16,13,2,14],"arrows":{},"effort":153,"info":{"len":44,"snacks":9,"arrows":0,"blocks":5}},{"n":20,"rule":4,"w":7,"h":7,"open":"1111011111101111110111111111110111111111111111111","start":5,"exit":31,"snacks":[40,1],"arrows":{"17":1,"25":1,"35":2},"effort":3684,"info":{"len":45,"snacks":2,"arrows":3,"blocks":4}},{"n":21,"rule":4,"w":7,"h":7,"open":"1111111111111111111111111111111111111101111110000","start":41,"exit":44,"snacks":[6,39,17,30,8,4,21],"arrows":{"19":2,"22":3,"23":0,"36":3},"effort":558,"info":{"len":44,"snacks":7,"arrows":4,"blocks":5}},{"n":22,"rule":3,"w":7,"h":7,"open":"1000011111111111111111111111111111110011111111111","start":0,"exit":38,"snacks":[23,25,28,45,41,6,11,15,33],"arrows":{},"effort":1410,"info":{"len":43,"snacks":9,"arrows":0,"blocks":6}},{"n":23,"rule":3,"w":7,"h":7,"open":"1111111111111111111110011111000111111111111111111","start":14,"exit":37,"snacks":[1,18,8,26,6,27,39,47,43],"arrows":{},"effort":448,"info":{"len":44,"snacks":9,"arrows":0,"blocks":5}},{"n":24,"rule":3,"w":7,"h":7,"open":"1111111111001111110111111001111111111111111111111","start":9,"exit":8,"snacks":[38,42,32,48,12,5,7,23],"arrows":{},"effort":1042,"info":{"len":44,"snacks":8,"arrows":0,"blocks":5}},{"n":25,"rule":3,"w":7,"h":7,"open":"1111100111110011111111111111111111111111111111111","start":24,"exit":4,"snacks":[2,15,7,29,44,33,38,34,25],"arrows":{},"effort":801,"info":{"len":45,"snacks":9,"arrows":0,"blocks":4}},{"n":26,"rule":3,"w":7,"h":7,"open":"1111111101111111111111111111111100111110011111011","start":47,"exit":9,"snacks":[20,11,6,0,28,23,43,45],"arrows":{},"effort":1905,"info":{"len":43,"snacks":8,"arrows":0,"blocks":6}},{"n":27,"rule":4,"w":7,"h":7,"open":"1111111111111111111111111111111111110110011111001","start":48,"exit":43,"snacks":[25,19,38,22,9,5,0,28],"arrows":{"2":1,"15":1,"33":1},"effort":1058,"info":{"len":44,"snacks":8,"arrows":3,"blocks":5}},{"n":28,"rule":4,"w":7,"h":7,"open":"1111110111111111111111111111111111110011111111111","start":38,"exit":5,"snacks":[26,20,48,44,30,8,9],"arrows":{"1":0,"19":1,"23":1,"32":0,"47":3},"effort":9348,"info":{"len":46,"snacks":7,"arrows":5,"blocks":3}},{"n":29,"rule":3,"w":7,"h":7,"open":"1111111111110011111111111111110111100011111111111","start":6,"exit":42,"snacks":[17,2,14,8,24,26,32,40,46],"arrows":{},"effort":142,"info":{"len":43,"snacks":9,"arrows":0,"blocks":6}},{"n":30,"rule":3,"w":7,"h":7,"open":"1111111111111111111111111111001111011111111111111","start":22,"exit":27,"snacks":[31,1,4,35,48,5],"arrows":{},"effort":90,"info":{"len":46,"snacks":6,"arrows":0,"blocks":3}}];
+const LEVEL_COUNT = LEVELS.length;
+[...LEVELS, ...DAILY].forEach(l => { l.openArr = l.open.split('').map(Number); l.arrows = l.arrows || {}; });
+const RULES = { 1: { visitAll: false, snacks: false, arrows: false }, 2: { visitAll: true, snacks: false, arrows: false }, 3: { visitAll: true, snacks: true, arrows: false }, 4: { visitAll: true, snacks: true, arrows: true } };
+const ARROW = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+function neighbors(L, i) {
+  const x = i % L.w, y = (i / L.w) | 0, out = [];
+  for (const [dx, dy] of DIRS) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= L.w || ny >= L.h) continue; const j = ny * L.w + nx; if (L.openArr[j]) out.push(j); }
+  return out;
+}
+
+/* ---------- Audio ---------- */
+let actx = null;
+function audio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } } if (actx && actx.state === 'suspended') actx.resume(); return actx; }
+function tone(freq, dur, type = 'sine', gain = 0.18, when = 0, slide = 0) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, a.currentTime + when);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), a.currentTime + when + dur);
+  g.gain.setValueAtTime(0.0001, a.currentTime + when);
+  g.gain.exponentialRampToValueAtTime(gain, a.currentTime + when + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + when + dur);
+  o.connect(g).connect(a.destination); o.start(a.currentTime + when); o.stop(a.currentTime + when + dur + 0.02);
+}
+const sfx = {
+  step(k) { tone(420 + Math.min(k, 24) * 22, 0.07, 'triangle', 0.12); },
+  back() { tone(300, 0.06, 'triangle', 0.08); },
+  snack(i) { tone(700 + i * 120, 0.12, 'sine', 0.16); tone(1400 + i * 120, 0.08, 'sine', 0.08, 0.05); },
+  crunch() { tone(180, 0.05, 'square', 0.07, 0.02, -60); tone(140, 0.05, 'square', 0.06, 0.09, -50); },
+  fail() { tone(220, 0.35, 'sawtooth', 0.14, 0, -150); tone(110, 0.4, 'square', 0.06, 0.05, -60); },
+  win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.14, i * 0.09)); },
+  clear() { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.25, 'triangle', 0.12, i * 0.1)); },
+};
+
+/* ---------- Silent play logging (localStorage) ---------- */
+const LOG_KEY = 'tpr-log-v0.11', PROG_KEY = 'tpr-progress-v0.11', MAX_KEY = 'tpr-max-v0.11', INTRO_KEY = 'tpr-intro-v0.10', DAILY_KEY = 'tpr-daily-v0.10';
+const log = {
+  data: null,
+  load() {
+    try { this.data = JSON.parse(localStorage.getItem(LOG_KEY)) || null; } catch (e) { this.data = null; }
+    if (!this.data) this.data = { id: Math.random().toString(36).slice(2, 8), version: VERSION, days: [], events: [] };
+    const today = new Date().toISOString().slice(0, 10);
+    if (!this.data.days.includes(today)) this.data.days.push(today);
+    this.event('session_start', { ua: navigator.userAgent.slice(0, 60) });
+  },
+  queue: [],
+  flush(useBeacon) {
+    if (!COLLECT_URL || !this.queue.length) return;
+    const body = JSON.stringify({ id: this.data.id, v: VERSION, lang: LANG, events: this.queue.splice(0) });
+    try {
+      if (useBeacon && navigator.sendBeacon) { navigator.sendBeacon(COLLECT_URL, new Blob([body], { type: 'text/plain' })); return; }
+      fetch(COLLECT_URL, { method: 'POST', mode: 'no-cors', keepalive: true, headers: { 'Content-Type': 'text/plain' }, body }).catch(() => {});
+    } catch (err) {}
+  },
+  event(e, extra = {}) {
+    if (!this.data) return;
+    this.queue.push(Object.assign({ t: Date.now(), e }, extra));
+    if (['level_complete', 'level_fail', 'daily_complete', 'all_levels_complete', 'session_start', 'intro_closed', 'menu_jump'].includes(e)) this.flush(false);
+    this.data.events.push(Object.assign({ t: Date.now(), e }, extra));
+    if (this.data.events.length > 4000) this.data.events.splice(0, 800);
+    try { localStorage.setItem(LOG_KEY, JSON.stringify(this.data)); } catch (err) {}
+  },
+  summary() {
+    const ev = this.data.events, done = new Set(ev.filter(x => x.e === 'level_complete').map(x => x.lvl));
+    const fails = ev.filter(x => x.e === 'level_fail').length;
+    const secs = Math.round(ev.filter(x => x.e === 'level_complete').reduce((a, x) => a + (x.ms || 0), 0) / 1000);
+    return { id: this.data.id, days: this.data.days.length, levelsDone: done.size, maxLevel: Math.max(0, ...done), fails, playSecs: secs };
+  },
+  playCode() { const s = this.summary(); return `TPR11-${s.id}-L${s.levelsDone}-M${s.maxLevel}-F${s.fails}-T${s.playSecs}-D${s.days}`; },
+};
+
+/* ---------- Game state ---------- */
+const game = { n: 1, L: null, rule: null, path: [], snackIdx: 0, locked: false, dragging: false, fails: 0, started: 0, lastPt: null, lockFrom: 0 };
+const CELL = 100, GAP = 7, PAD = 24;
+const $ = id => document.getElementById(id);
+const board = $('board');
+const SVG = 'http://www.w3.org/2000/svg';
+function el(tag, attrs = {}, parent) { const e = document.createElementNS(SVG, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function center(L, i) { return [PAD + (i % L.w) * CELL + CELL / 2, PAD + ((i / L.w) | 0) * CELL + CELL / 2]; }
+
+function raccoonSVG(parent) {
+  const g = el('g', { id: 'raccoon' }, parent);
+  const body = el('g', { id: 'rBody' }, g);
+  const tail = el('g', {}, body);
+  el('path', { d: 'M-18 10 Q-46 6 -44 -18', fill: 'none', stroke: 'var(--fur)', 'stroke-width': 13, 'stroke-linecap': 'round' }, tail);
+  el('path', { d: 'M-18 10 Q-46 6 -44 -18', fill: 'none', stroke: 'var(--mask)', 'stroke-width': 13, 'stroke-linecap': 'round', 'stroke-dasharray': '7 9' }, tail);
+  const belly = el('g', { id: 'rBelly' }, body);
+  el('ellipse', { cx: 0, cy: 8, rx: 24, ry: 19, fill: 'var(--fur)' }, belly);
+  el('ellipse', { cx: 0, cy: 12, rx: 13, ry: 10, fill: '#c7cbd0' }, belly);
+  const head = el('g', { transform: 'translate(0,-16)' }, body);
+  el('path', { d: 'M-22 -4 L-15 -22 L-5 -10 Z', fill: 'var(--fur)' }, head);
+  el('path', { d: 'M22 -4 L15 -22 L5 -10 Z', fill: 'var(--fur)' }, head);
+  el('circle', { cx: 0, cy: 0, r: 22, fill: 'var(--fur)' }, head);
+  el('path', { d: 'M-21 -2 Q-12 -12 0 -4 Q12 -12 21 -2 Q14 10 0 8 Q-14 10 -21 -2 Z', fill: 'var(--mask)' }, head);
+  el('ellipse', { cx: -9, cy: 0, rx: 5.5, ry: 6, fill: '#fff' }, head);
+  el('ellipse', { cx: 9, cy: 0, rx: 5.5, ry: 6, fill: '#fff' }, head);
+  el('circle', { cx: -8, cy: 1, r: 2.8, fill: '#111', class: 'pupil' }, head);
+  el('circle', { cx: 10, cy: 1, r: 2.8, fill: '#111', class: 'pupil' }, head);
+  for (const cx of [-9, 9]) { const x = el('g', { class: 'xeye', transform: `translate(${cx},0)` }, head);
+    el('path', { d: 'M-4 -4 L4 4 M4 -4 L-4 4', stroke: '#111', 'stroke-width': 2.4, 'stroke-linecap': 'round' }, x); }
+  el('ellipse', { cx: 0, cy: 10, rx: 4, ry: 3, fill: '#111' }, head);
+  return g;
+}
+
+function render() {
+  const L = game.L;
+  board.innerHTML = '';
+  const W = L.w * CELL + PAD * 2, H = L.h * CELL + PAD * 2;
+  board.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const defs = el('defs', {}, board);
+  const glow = el('filter', { id: 'glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+  el('feGaussianBlur', { stdDeviation: 12, result: 'b' }, glow);
+  const m = el('feMerge', {}, glow); el('feMergeNode', { in: 'b' }, m); el('feMergeNode', { in: 'SourceGraphic' }, m);
+  el('rect', { x: 0, y: 0, width: W, height: H, rx: 28, fill: 'var(--bg-deep)' }, board);
+  const tiles = el('g', { id: 'tiles' }, board);
+  for (let i = 0; i < L.w * L.h; i++) {
+    const x = PAD + (i % L.w) * CELL + GAP / 2, y = PAD + ((i / L.w) | 0) * CELL + GAP / 2, s = CELL - GAP;
+    if (L.openArr[i]) {
+      const checker = ((i % L.w) + ((i / L.w) | 0)) % 2;
+      el('rect', { x, y, width: s, height: s, rx: 16, fill: checker ? 'var(--tile-a)' : 'var(--tile-b)', id: 'tile' + i }, tiles);
+    } else {
+      el('rect', { x, y, width: s, height: s, rx: 14, fill: 'var(--counter)' }, tiles);
+      el('rect', { x: x + 10, y: y + 10, width: s - 20, height: s - 20, rx: 8, fill: 'none', stroke: 'rgba(255,255,255,.12)', 'stroke-width': 3 }, tiles);
+    }
+  }
+  const [ex, ey] = center(L, L.exit);
+  el('circle', { cx: ex, cy: ey, r: 34, fill: 'var(--lamp)', opacity: .22, filter: 'url(#glow)' }, board);
+  el('rect', { x: ex - 30, y: ey - 30, width: 60, height: 60, rx: 8, fill: '#3b2a12' }, board);          // open window: night sky + moon
+  el('rect', { x: ex - 23, y: ey - 23, width: 46, height: 46, rx: 5, fill: '#0b1230' }, board);
+  el('circle', { cx: ex + 6, cy: ey - 6, r: 11, fill: 'var(--lamp)' }, board);
+  el('circle', { cx: ex + 11, cy: ey - 9, r: 9, fill: '#0b1230' }, board);
+  el('rect', { x: ex - 2, y: ey - 23, width: 4, height: 46, fill: '#3b2a12' }, board);
+  el('rect', { x: ex - 23, y: ey - 2, width: 46, height: 4, fill: '#3b2a12' }, board);
+  el('polyline', { id: 'pathSoft', fill: 'none', stroke: 'var(--path-soft)', 'stroke-width': 42, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', points: '' }, board);
+  el('polyline', { id: 'pathLine', fill: 'none', stroke: 'var(--path)', 'stroke-width': 18, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', points: '' }, board);
+  // snacks: numbered cookies, eaten in order
+  L.snacks.forEach((c, k) => {
+    const [sx, sy] = center(L, c);
+    const g = el('g', { id: 'snack' + k, class: 'snack' }, board);
+    el('circle', { cx: sx, cy: sy, r: 32, fill: 'var(--snack)' }, g);
+    el('circle', { cx: sx, cy: sy, r: 32, fill: 'none', stroke: '#b0813f', 'stroke-width': 4 }, g);
+    [[-14, -12], [14, -8], [-10, 16], [16, 14]].forEach(([dx, dy]) => el('circle', { cx: sx + dx, cy: sy + dy, r: 3.2, fill: '#6b4420' }, g));
+    el('circle', { cx: sx, cy: sy, r: 19, fill: '#2a1a06' }, g);
+    el('text', { x: sx, y: sy + 11, 'text-anchor': 'middle', 'font-family': 'var(--font)', 'font-size': 32, 'font-weight': 600, fill: '#fff' }, g).textContent = k + 1;
+  });
+  for (const k in L.arrows) {                      // one-way tiles: a chevron pointing where the raccoon gets pushed
+    const [ax, ay] = center(L, +k), d = ARROW[L.arrows[k]], ang = Math.atan2(d[1], d[0]) * 180 / Math.PI;
+    const g = el('g', { class: 'arrowTile', transform: `translate(${ax},${ay}) rotate(${ang})` }, board);
+    el('path', { d: 'M-22 -16 L2 0 L-22 16 M0 -16 L24 0 L0 16', fill: 'none', stroke: 'rgba(255,255,255,.85)', 'stroke-width': 8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, g);
+  }
+  raccoonSVG(board);
+  placeRaccoon(L.start);
+  el('rect', { x: 0, y: 0, width: W, height: H, fill: 'transparent' }, board);   // hit layer on top
+  drawPath();
+}
+let racPos = [0, 0], idleT0 = performance.now(), shakeUntil = 0;
+function placeRaccoon(cell) { racPos = center(game.L, cell); }
+function drawPath() {
+  const pts = game.path.map(c => center(game.L, c).join(',')).join(' ');
+  $('pathLine').setAttribute('points', pts); $('pathSoft').setAttribute('points', pts);
+  game.L.snacks.forEach((c, k) => { const s = $('snack' + k); if (s && !game.path.includes(c)) { s.setAttribute('opacity', 1); s.removeAttribute('transform'); } });
+}
+function idleLoop(now) {
+  const r = $('raccoon'); if (r) {
+    const bob = Math.sin((now - idleT0) / 420) * 2.5, sq = 1 + Math.sin((now - idleT0) / 420) * 0.02;
+    const sh = now < shakeUntil ? Math.sin(now / 18) * 9 : 0, tilt = now < shakeUntil ? Math.sin(now / 25) * 12 : 0;   // dies on the spot
+    r.setAttribute('transform', `translate(${racPos[0] + sh},${racPos[1] + 6 + bob}) rotate(${tilt}) scale(${1 / sq},${sq})`);
+    const blink = ((now / 100) | 0) % 38 === 0 ? 0.2 : 1;
+    r.querySelectorAll('.pupil').forEach(p => p.setAttribute('transform', `scale(1,${blink})`));
+  }
+  requestAnimationFrame(idleLoop);
+}
+requestAnimationFrame(idleLoop);
+
+const INTRO = {
+  1: { title: 'Sneak to the window', text: (matchMedia('(pointer: coarse)').matches ? 'Drag the raccoon along the floor to the open window. Drag back to undo.' : 'Drag the raccoon with your mouse along the floor to the open window. Drag back to undo. (No keyboard controls yet.)'),
+       pic: `<svg viewBox="0 0 150 150"><rect x="8" y="8" width="134" height="134" rx="14" fill="#13182a"/>
+         <g fill="var(--tile-b)"><rect x="18" y="18" width="36" height="36" rx="7"/><rect x="57" y="18" width="36" height="36" rx="7"/><rect x="96" y="18" width="36" height="36" rx="7"/><rect x="96" y="57" width="36" height="36" rx="7"/><rect x="96" y="96" width="36" height="36" rx="7"/></g>
+         <rect x="104" y="100" width="20" height="28" rx="4" fill="var(--lamp)"/>
+         <polyline points="36,36 75,36 114,36 114,75 114,110" fill="none" stroke="var(--path)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+         <circle cx="36" cy="36" r="11" fill="var(--fur)"/></svg>` },
+  2: { title: 'New rule: every tile', text: 'Now the raccoon must cross every floor tile exactly once before reaching the window. A tile left behind means he gets spotted.',
+       pic: `<svg viewBox="0 0 150 150"><rect x="8" y="8" width="134" height="134" rx="14" fill="#13182a"/>
+         <g fill="var(--tile-b)"><rect x="18" y="18" width="36" height="36" rx="7"/><rect x="57" y="18" width="36" height="36" rx="7"/><rect x="96" y="18" width="36" height="36" rx="7"/><rect x="18" y="57" width="36" height="36" rx="7"/><rect x="57" y="57" width="36" height="36" rx="7"/><rect x="96" y="57" width="36" height="36" rx="7"/><rect x="18" y="96" width="36" height="36" rx="7"/><rect x="57" y="96" width="36" height="36" rx="7"/><rect x="96" y="96" width="36" height="36" rx="7"/></g>
+         <rect x="104" y="100" width="20" height="28" rx="4" fill="var(--lamp)"/>
+         <polyline points="36,36 36,75 36,114 75,114 75,75 75,36 114,36 114,75 114,110" fill="none" stroke="var(--path)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+         <circle cx="36" cy="36" r="11" fill="var(--fur)"/></svg>` },
+  3: { title: 'New rule: snacks in order', text: 'Grab the snacks in number order, 1 then 2 then 3, and still cross every tile before the window.',
+       pic: `<svg viewBox="0 0 150 150"><rect x="8" y="8" width="134" height="134" rx="14" fill="#13182a"/>
+         <g fill="var(--tile-b)"><rect x="18" y="18" width="36" height="36" rx="7"/><rect x="57" y="18" width="36" height="36" rx="7"/><rect x="96" y="18" width="36" height="36" rx="7"/><rect x="18" y="57" width="36" height="36" rx="7"/><rect x="57" y="57" width="36" height="36" rx="7"/><rect x="96" y="57" width="36" height="36" rx="7"/><rect x="18" y="96" width="36" height="36" rx="7"/><rect x="57" y="96" width="36" height="36" rx="7"/><rect x="96" y="96" width="36" height="36" rx="7"/></g>
+         <rect x="104" y="100" width="20" height="28" rx="4" fill="var(--lamp)"/>
+         <polyline points="36,36 36,75 36,114 75,114 75,75 75,36 114,36 114,75 114,110" fill="none" stroke="var(--path)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+         <g font-family="var(--font)" font-weight="600" font-size="15" text-anchor="middle" fill="#3b2a12"><circle cx="36" cy="114" r="12" fill="var(--snack)"/><text x="36" y="119">1</text><circle cx="75" cy="36" r="12" fill="var(--snack)"/><text x="75" y="41">2</text><circle cx="114" cy="75" r="12" fill="var(--snack)"/><text x="114" y="80">3</text></g>
+         <circle cx="36" cy="36" r="11" fill="var(--fur)"/></svg>` },
+  4: { title: 'New rule: slippery arrows', text: 'Arrow tiles shove the raccoon one tile in the arrow direction, and there is no dragging back past a shove. Shoved into a counter or a crossed tile: spotted.',
+       pic: `<svg viewBox="0 0 150 150"><rect x="8" y="8" width="134" height="134" rx="14" fill="#13182a"/>
+         <g fill="var(--tile-b)"><rect x="18" y="18" width="36" height="36" rx="7"/><rect x="57" y="18" width="36" height="36" rx="7"/><rect x="96" y="18" width="36" height="36" rx="7"/><rect x="18" y="57" width="36" height="36" rx="7"/><rect x="57" y="57" width="36" height="36" rx="7"/><rect x="96" y="57" width="36" height="36" rx="7"/><rect x="18" y="96" width="36" height="36" rx="7"/><rect x="57" y="96" width="36" height="36" rx="7"/><rect x="96" y="96" width="36" height="36" rx="7"/></g>
+         <polyline points="36,36 36,75 36,114 75,114 75,75 75,36 114,36 114,75 114,110" fill="none" stroke="var(--path)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+         <g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M28 104 L36 112 L44 104"/><path d="M106 28 L114 36 L122 28" transform="translate(0,2)"/></g>
+         <circle cx="36" cy="36" r="11" fill="var(--fur)"/></svg>` },
+};
+function introSeen() { try { return JSON.parse(localStorage.getItem(INTRO_KEY)) || []; } catch (e) { return []; } }
+function showIntro(rule) {
+  const i = INTRO[rule], tx = t().intro[rule]; $('introPic').innerHTML = i.pic; $('introTitle').textContent = tx[0];
+  $('introText').textContent = (rule === 1 && !matchMedia('(pointer: coarse)').matches && tx[2]) ? tx[2] : tx[1];
+  $('intro').classList.add('show'); game.locked = true; log.event('intro_shown', { rule });
+  try { const seen = introSeen(); if (!seen.includes(rule)) { seen.push(rule); localStorage.setItem(INTRO_KEY, JSON.stringify(seen)); } } catch (e) {}
+}
+$('introOk').addEventListener('click', () => { $('intro').classList.remove('show'); game.locked = false; log.event('intro_closed', { rule: game.L.rule }); });
+function loadLevel(n) {
+  game.daily = false; $('dailyBtn').textContent = t().daily;
+  document.documentElement.setAttribute('data-kitchen', Math.floor((n - 1) / 10) % 4);
+  const l = LEVELS[n - 1];
+  game.n = n; game.L = l; game.rule = RULES[l.rule]; game.path = [l.start]; game.snackIdx = 0;
+  game.locked = false; game.fails = 0; game.started = Date.now(); game.dragging = false; game.lockFrom = 0;
+  $('lvlText').textContent = n; $('levelNum').firstElementChild.textContent = t().level; $('spotN').textContent = 0; $('spotted').classList.remove('show');
+  const firstOfRule = LEVELS.findIndex(x => x.rule === l.rule) + 1;
+  $('hintLine').textContent = t().ruleLine[l.rule];
+  saveMax(n);
+  render();
+  try { localStorage.setItem(PROG_KEY, String(n)); } catch (e) {}
+  log.event('level_start', { lvl: n, rule: l.rule });
+  if (!introSeen().includes(l.rule)) showIntro(l.rule);
+}
+
+/* ---------- Input: drag a route. Pointer movement is sampled along its line so fast swipes don't skip tiles ---------- */
+function svgPoint(clientX, clientY) { const pt = board.createSVGPoint(); pt.x = clientX; pt.y = clientY; return pt.matrixTransform(board.getScreenCTM().inverse()); }
+function cellAtPoint(p) {
+  const L = game.L, cx = Math.floor((p.x - PAD) / CELL), cy = Math.floor((p.y - PAD) / CELL);
+  if (cx < 0 || cy < 0 || cx >= L.w || cy >= L.h) return -1;
+  const fx = (p.x - PAD) / CELL - cx, fy = (p.y - PAD) / CELL - cy;
+  if (Math.abs(fx - 0.5) > 0.46 || Math.abs(fy - 0.5) > 0.46) return -2;   // small corner dead zone
+  return cy * L.w + cx;
+}
+function adjacent(a, b) { const L = game.L; return Math.abs(a % L.w - b % L.w) + Math.abs(((a / L.w) | 0) - ((b / L.w) | 0)) === 1; }
+function visitCell(c) {                      // one cell the finger is over: rewind, extend, or ignore
+  if (c < 0 || game.locked) return;
+  const head = game.path[game.path.length - 1];
+  if (c === head) return;
+  const idx = game.path.indexOf(c);
+  if (idx >= 0) {
+    let cut = idx; while (cut > 0 && game.rule.arrows && (game.path[cut] in game.L.arrows)) cut--;   // never stop on an arrow tile
+    if (cut < game.lockFrom) { if (idx < game.lockFrom) toast(t().noWayBack); return; }   // shoved = committed
+    game.path.length = cut + 1; game.snackIdx = game.L.snacks.filter(s => game.path.includes(s)).length; sfx.back(); drawPath(); updateRaccoon(); return;
+  }
+  if (!game.L.openArr[c]) return;
+  if (adjacent(head, c)) { extend(c); return; }
+  // the finger skipped a tile (corner cut or fast swipe): walk the shortest open, unvisited route of at most 3 steps
+  const L = game.L, prev = new Map([[head, null]]), q = [[head, 0]];
+  let hit = null;
+  while (q.length && !hit) {
+    const [cur, d] = q.shift(); if (d >= 3) continue;
+    for (const nb of neighbors(L, cur)) {
+      if (prev.has(nb) || game.path.includes(nb)) continue;
+      prev.set(nb, cur); if (nb === c) { hit = nb; break; } q.push([nb, d + 1]);
+    }
+  }
+  if (!hit) return;
+  const route = []; for (let x = hit; x !== head; x = prev.get(x)) route.push(x);
+  for (const x of route.reverse()) { if (game.locked) break; extend(x); }
+}
+function onDown(ev) {
+  audio(); if (game.locked) return;
+  const p = svgPoint(ev.clientX, ev.clientY), c = cellAtPoint(p);
+  game.dragging = true; game.lastPt = p;
+  try { board.setPointerCapture(ev.pointerId); } catch (e) {}
+  visitCell(c);
+}
+function onMove(ev) {
+  if (!game.dragging || game.locked) return;
+  const p = svgPoint(ev.clientX, ev.clientY), last = game.lastPt || p;
+  const dist = Math.hypot(p.x - last.x, p.y - last.y), steps = Math.max(1, Math.ceil(dist / (CELL / 5)));
+  for (let s = 1; s <= steps; s++) {
+    const q = { x: last.x + (p.x - last.x) * s / steps, y: last.y + (p.y - last.y) * s / steps };
+    visitCell(cellAtPoint(q)); if (game.locked) break;
+  }
+  game.lastPt = p;
+}
+function onUp() { game.dragging = false; game.lastPt = null; }
+function extend(c) {
+  const L = game.L;
+  const sIdx = L.snacks.indexOf(c);
+  if (game.rule.snacks && sIdx >= 0 && sIdx !== game.snackIdx) { game.path.push(c); drawPath(); updateRaccoon(); fail('snack', c); return; }
+  game.path.push(c); drawPath(); updateRaccoon();
+  if (sIdx >= 0 && game.rule.snacks) { game.snackIdx++; sfx.snack(sIdx); sfx.crunch(); eatSnack(sIdx); } else sfx.step(game.path.length);
+  if (game.rule.arrows && c in L.arrows && c !== L.exit) {          // pushed: the next tile is forced
+    const d = ARROW[L.arrows[c]], x = c % L.w + d[0], y = ((c / L.w) | 0) + d[1];
+    const t = (x < 0 || y < 0 || x >= L.w || y >= L.h) ? -1 : y * L.w + x;
+    if (t < 0 || !L.openArr[t] || game.path.includes(t)) { shove(c, d, 240, () => fail('deadend')); return; }
+    game.locked = true;
+    shove(c, d, 240, () => { game.locked = false; if (game.path[game.path.length - 1] === c) { extend(t); game.lockFrom = game.path.length - 1; } });
+    return;
+  }
+  if (c === L.exit) {
+    const allVisited = game.path.length === L.openArr.reduce((a, b) => a + b, 0);
+    if (game.rule.visitAll && !allVisited) { fail('missed'); return; }
+    if (game.rule.snacks && game.snackIdx !== L.snacks.length) { fail('snack'); return; }
+    win(); return;
+  }
+  const free = neighbors(L, c).filter(n => !game.path.includes(n));
+  if (!free.length) fail('deadend');
+}
+function shove(cell, d, ms, done) {                  // struggles against the arrow, then gets pushed
+  const [cx, cy] = center(game.L, cell), t0 = performance.now();
+  sfx.back(); if (navigator.vibrate) navigator.vibrate([15, 20, 15, 20, 15]);
+  (function step(now) {
+    const t = Math.min(1, (now - t0) / ms);
+    const jitter = t < 0.6 ? Math.sin(t * 60) * 7 : 0;           // vibrate against the push direction
+    const lean = t < 0.6 ? -d[0] * 10 * (1 - t) : d[0] * 14 * (t - 0.6) / 0.4;
+    racPos = [cx + lean + jitter * (d[1] !== 0 ? 1 : 0), cy + (d[1] !== 0 ? -d[1] * 10 * (1 - t) : 0) + jitter * (d[0] !== 0 ? 0.3 : 0)];
+    idleT0 = now;
+    if (t < 1) requestAnimationFrame(step); else done();
+  })(t0);
+}
+function eatSnack(k) {                                   // cookie pops up, spins and vanishes like a picked-up coin
+  const g = $('snack' + k); if (!g) return;
+  const c = game.L.snacks[k], [sx, sy] = center(game.L, c), t0 = performance.now();
+  g.setAttribute('opacity', 1);
+  (function step(now) {
+    const t = Math.min(1, (now - t0) / 420), up = 55 * Math.sin(t * Math.PI / 2), sc = t < 0.5 ? 1 + t * 0.7 : Math.max(0, 1.35 - (t - 0.5) * 2.7), rot = t * 540;
+    g.setAttribute('transform', `translate(${sx},${sy - up}) rotate(${rot}) scale(${sc}) translate(${-sx},${-sy})`);
+    g.setAttribute('opacity', 1 - t * t);
+    if (t < 1) requestAnimationFrame(step); else g.setAttribute('opacity', 0);
+  })(t0);
+}
+function updateRaccoon() {
+  placeRaccoon(game.path[game.path.length - 1]);
+  const fat = 1 + 0.12 * game.snackIdx;                // every cookie makes him rounder
+  const b = $('rBelly'); if (b) b.setAttribute('transform', `translate(0,8) scale(${fat}) translate(0,-8)`);
+}
+
+function fail(why, cell) {
+  game.locked = true; game.fails++; game.dragging = false;
+  $('spotN').textContent = game.fails; $('spotted').classList.add('show');
+  sfx.fail(); shakeUntil = performance.now() + 500; $('raccoon').classList.add('dead');
+  if (navigator.vibrate) navigator.vibrate(60);
+  if (why === 'missed') for (let i = 0; i < game.L.w * game.L.h; i++) if (game.L.openArr[i] && !game.path.includes(i)) $('tile' + i).classList.add('missed');
+  if (why === 'snack') { const k = game.L.snacks.indexOf(cell); const g = $('snack' + (k >= 0 ? k : game.snackIdx)); if (g) g.classList.add('missed'); }
+  log.event('level_fail', { lvl: game.n, why, len: game.path.length });
+  setTimeout(() => { game.path = [game.L.start]; game.snackIdx = 0; game.lockFrom = 0; render(); game.locked = false; }, why === 'deadend' ? 700 : 1100);
+}
+function win() {
+  game.locked = true; game.dragging = false;
+  log.event(game.daily ? 'daily_solved' : 'level_complete', { lvl: game.n, ms: Date.now() - game.started, fails: game.fails });
+  if (!game.daily) saveMax(game.n + 1);
+  sfx.win(); if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+  const t1 = performance.now(), r = $('raccoon'), [ex, ey] = center(game.L, game.L.exit);
+  (function pop(now) {                        // squash-and-stretch at the door, then slip out through it
+    const s = Math.min(1, (now - t1) / 800);
+    const sq = s < 0.5 ? 1 + Math.sin(s * 2 * Math.PI) * 0.28 : 1;
+    const out = s > 0.5 ? (s - 0.5) * 2 : 0;
+    $('rBody').setAttribute('transform', `scale(${1 / sq},${sq})`);
+    r.setAttribute('opacity', 1 - out);
+    racPos = [ex, ey - out * 30];
+    if (s < 1) requestAnimationFrame(pop);
+  })(t1);
+  setTimeout(() => { if (game.daily) finishDaily(); else if (game.n >= LEVEL_COUNT) endScreen(); else loadLevel(game.n + 1); }, 950);
+}
+
+/* ---------- Daily puzzle: same board for everyone each day, streak, share ---------- */
+const DAILY_EPOCH = 20732;   // Oct 6 2026 → daily #1
+function dailyIndex() { const d = new Date(); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000); }
+function dailyState() { try { return JSON.parse(localStorage.getItem(DAILY_KEY)) || {}; } catch (e) { return {}; } }
+function saveDaily(st) { try { localStorage.setItem(DAILY_KEY, JSON.stringify(st)); } catch (e) {} }
+function fmt(ms) { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function loadDaily() {
+  const day = dailyIndex(), l = DAILY[day % DAILY.length], st = dailyState();
+  game.daily = true; game.dailyDay = day; game.n = 0; game.L = l; game.rule = RULES[l.rule]; game.path = [l.start]; game.snackIdx = 0;
+  game.locked = false; game.fails = 0; game.started = Date.now(); game.dragging = false; game.lockFrom = 0;
+  document.documentElement.setAttribute('data-kitchen', 1);
+  $('levelNum').firstElementChild.textContent = t().daily; $('lvlText').textContent = '#' + (day - DAILY_EPOCH); $('spotN').textContent = 0; $('spotted').classList.remove('show');
+  $('hintLine').textContent = t().ruleLine[l.rule]; $('dailyBtn').textContent = t().levels;
+  render();
+  log.event('daily_open', { day, rule: l.rule, done: !!(st.done && st.done[day]) });
+  if (!introSeen().includes(l.rule)) showIntro(l.rule);
+  if (st.done && st.done[day]) showDailyCard(st.done[day], st, false);
+}
+function finishDaily() {
+  const st = dailyState(), day = game.dailyDay, ms = Date.now() - game.started;
+  st.done = st.done || {}; const first = !st.done[day];
+  if (first) {
+    st.done[day] = { ms, fails: game.fails };
+    st.streak = (st.lastDay === day - 1) ? (st.streak || 0) + 1 : 1; st.lastDay = day; saveDaily(st);
+    log.event('daily_complete', { day, ms, fails: game.fails, streak: st.streak });
+  }
+  showDailyCard(st.done[day], st, first);
+}
+function showDailyCard(res, st, first) {
+  $('dailyTitle').textContent = first ? t().dailyFirst : t().dailyDone;
+  $('dailyTime').textContent = fmt(res.ms);
+  $('dailyText').textContent = t().dailyText(res.fails, st.streak || 1);
+  $('dailyCard').classList.add('show'); game.locked = true;
+}
+$('dailyShare').addEventListener('click', async () => {
+  const st = dailyState(), day = game.dailyDay, r = st.done[day];
+  const text = t().shareText(day - DAILY_EPOCH, fmt(r.ms), r.fails, st.streak, `${location.origin}${location.pathname}#daily`);
+  log.event('share_clicked', { day });
+  try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast(t().copiedShare); } } catch (e) {}
+});
+$('dailyBack').addEventListener('click', () => { $('dailyCard').classList.remove('show'); loadLevel(Math.min(maxLevel(), LEVEL_COUNT)); });
+$('dailyBtn').addEventListener('click', () => { if (game.daily) loadLevel(Math.min(maxLevel(), LEVEL_COUNT)); else loadDaily(); });
+
+/* ---------- End screen, toast, debug ---------- */
+function endScreen() {
+  sfx.clear(); log.event('all_levels_complete', {});
+  const s = log.summary();
+  $('endStats').textContent = t().endStats(s.levelsDone, s.fails, Math.round(s.playSecs / 60));
+  $('playCode').textContent = log.playCode(); $('end').classList.add('show');
+}
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1600); }
+async function copyText(txt) { try { await navigator.clipboard.writeText(txt); toast(t().copied); } catch (e) { toast(t().copyFail); } }
+function showDebug() {
+  const d = $('debug'); d.classList.add('show');
+  let html = `<p><b>${VERSION}</b> · ${LEVEL_COUNT} levels · <button id="dbgLog">Copy full log</button> <button id="dbgClose">Close</button></p><p>?debug=1&level=N jumps to level N.</p>`;
+  html += '<table><tr><th>#</th><th>rule</th><th>size</th><th>score</th><th>info</th></tr>';
+  for (const L of LEVELS) html += `<tr><td>${L.n}</td><td>${L.rule}</td><td>${L.w}×${L.h}</td><td>${L.score}</td><td>${Object.entries(L.info).map(([k, v]) => k + ' ' + v).join(', ')}</td></tr>`;
+  d.innerHTML = html + '</table>';
+  $('dbgLog').onclick = () => copyText(JSON.stringify(log.data));
+  $('dbgClose').onclick = () => d.classList.remove('show');
+}
+
+const params = new URLSearchParams(location.search);
+const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''));
+const levelParam = params.get('level') || hashParams.get('level');
+/* ---------- Progress + level menu ---------- */
+function maxLevel() { try { return Math.max(1, parseInt(localStorage.getItem(MAX_KEY)) || 1); } catch (e) { return 1; } }
+function saveMax(n) { try { if (n > maxLevel()) localStorage.setItem(MAX_KEY, String(Math.min(LEVEL_COUNT, n))); } catch (e) {} }
+const RULE_NAMES = { 1: 'Reach the window', 2: 'Every tile', 3: 'Snacks in order', 4: 'Slippery arrows' };
+function openMenu() {
+  const wrap = $('menuGrids'); wrap.innerHTML = ''; const mx = maxLevel();
+  for (const r of [1, 2, 3, 4]) {
+    const h = document.createElement('h2'); h.textContent = t().ruleNames[r] + '  ⓘ'; h.style.cursor = 'pointer';
+    h.onclick = () => { $('menu').classList.remove('show'); showIntro(r); }; wrap.appendChild(h);
+    const g = document.createElement('div'); g.className = 'lgrid';
+    LEVELS.filter(l => l.rule === r).forEach(l => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'lcell'; b.textContent = l.n;
+      if (l.n < mx) b.classList.add('done'); if (l.n === game.n) b.classList.add('current');
+      b.disabled = l.n > mx && !params.get('debug');
+      b.onclick = () => { $('menu').classList.remove('show'); log.event('menu_jump', { from: game.n, to: l.n }); loadLevel(l.n); };
+      g.appendChild(b);
+    });
+    wrap.appendChild(g);
+  }
+  $('menu').classList.add('show'); log.event('menu_open', { lvl: game.n });
+}
+$('menuBtn').addEventListener('click', openMenu);
+let titleTaps = 0;
+$('menuTitle').addEventListener('click', () => { if (++titleTaps >= 5) { titleTaps = 0; saveMax(LEVEL_COUNT); toast(t().unlocked); openMenu(); } });
+$('menuClose').addEventListener('click', () => $('menu').classList.remove('show'));
+
+function applyLang() {
+  document.documentElement.lang = LANG;
+  $('menuBtn').textContent = t().levels; $('retry').textContent = t().startOver;
+  $('spotted').childNodes[0].textContent = t().spotted + ' ';
+  $('dailyBtn').textContent = game.daily ? t().levels : t().daily;
+  $('menuTitle').textContent = t().menuTitle; $('menu').querySelector('p').textContent = t().menuHint; $('menuClose').textContent = t().backKitchen;
+  $('introOk').textContent = t().gotIt; $('dailyShare').textContent = t().share; $('dailyBack').textContent = t().backLevels;
+  $('end').querySelector('h1').textContent = t().endTitle; $('end').querySelectorAll('p')[1].textContent = t().sendCode;
+  $('copyCode').textContent = t().copyCode; $('replay').textContent = t().replay;
+  $('langBtn').textContent = t().langBtn;
+  if (game.L) { $('levelNum').firstElementChild.textContent = game.daily ? t().daily : t().level; $('hintLine').textContent = t().ruleLine[game.L.rule]; }
+}
+$('langBtn').addEventListener('click', () => { LANG = LANG === 'ja' ? 'en' : 'ja'; try { localStorage.setItem(LANG_KEY, LANG); } catch (e) {} applyLang(); openMenu(); log.event('lang', { lang: LANG }); });
+
+setInterval(() => log.flush(false), 20000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') log.flush(true); });
+window.addEventListener('pagehide', () => log.flush(true));
+
+/* ---------- Boot ---------- */
+log.load();
+board.addEventListener('pointerdown', onDown);
+board.addEventListener('pointermove', onMove);
+board.addEventListener('pointerup', onUp);
+board.addEventListener('pointercancel', () => { log.event('pointer_cancel', { lvl: game.n }); onUp(); });
+board.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+board.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+$('retry').addEventListener('click', () => { if (game.locked) return; game.path = [game.L.start]; game.snackIdx = 0; game.lockFrom = 0; drawPath(); updateRaccoon(); sfx.back(); log.event('restart', { lvl: game.n }); });
+$('copyCode').addEventListener('click', () => copyText(log.playCode()));
+$('replay').addEventListener('click', () => { $('end').classList.remove('show'); loadLevel(1); });
+let verTaps = 0;
+$('ver').addEventListener('click', () => { if (++verTaps >= 5) { verTaps = 0; copyText(JSON.stringify(log.data)); } });
+let startLevel = 1;
+try { startLevel = parseInt(localStorage.getItem(PROG_KEY)) || 1; } catch (e) {}
+if (levelParam) { startLevel = Math.min(LEVEL_COUNT, Math.max(1, parseInt(levelParam) || 1)); saveMax(startLevel); log.event('level_param', { lvl: startLevel }); }
+startLevel = Math.min(startLevel, maxLevel());
+if (params.get('debug')) showDebug();
+applyLang();
+if (location.hash.includes('daily')) loadDaily(); else loadLevel(startLevel);
+applyLang();
+</script>
+</body>
+</html>
