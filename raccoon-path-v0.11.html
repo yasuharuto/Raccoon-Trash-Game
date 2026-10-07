@@ -124,7 +124,7 @@
 'use strict';
 /* Silent play logging: events are also posted to a Google Sheet through an Apps Script web app.
    Paste the deployed script URL between the quotes below (leave empty to log on-device only). */
-const COLLECT_URL = '';
+const COLLECT_URL = 'https://script.google.com/macros/s/AKfycbxyCKrFeeE8r7CYKYTmggVSuY3GNBYBs1WB1h_JVn-pOxUQC9TwkEQTdJF3Vnh2b_-aEA/exec';
 const LANG_KEY = 'tpr-lang';
 let LANG = 'en';
 try { LANG = localStorage.getItem(LANG_KEY) || ((navigator.language || '').startsWith('ja') ? 'ja' : 'en'); } catch (e) {}
